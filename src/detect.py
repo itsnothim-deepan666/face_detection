@@ -2,6 +2,7 @@ import cv2
 import time
 from insightface.app import FaceAnalysis
 import onnxruntime as ort
+import numpy as np
 
 app = FaceAnalysis(
     name = "buffalo_l",
@@ -46,6 +47,24 @@ while True:
                 color[i % len(color)],
                 1
             )
+            left_eye = face.kps[1]
+            right_eye = face.kps[0]
+
+            angle = np.degrees(np.arctan2(right_eye[1] - left_eye[1], right_eye[0] - left_eye[0]))
+            print("Distance between eyes:", np.hypot(right_eye[0] - left_eye[0], right_eye[1] - left_eye[1]))
+            print("Angle between eyes:", angle)
+
+        cv2.line(
+            frame,
+            tuple(face.kps[0].astype(int)),
+            tuple(face.kps[1].astype(int)),
+            (255, 0, 0),
+            1
+        )
+
+        center = ((left_eye[0] + right_eye[0]) / 2, (left_eye[1] + right_eye[1]) / 2).astype(int)
+        M = cv2.getRotationMatrix2D(tuple(center), angle, 1.0)
+        aligned_face = cv2.warpAffine(frame, M, (frame.shape[1], frame.shape[0]))
 
         cv2.rectangle(
             frame,
@@ -78,6 +97,7 @@ while True:
 
     cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
     cv2.imshow("Face Detection", frame)
+    cv2.imshow("Aligned Face", aligned_face)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break

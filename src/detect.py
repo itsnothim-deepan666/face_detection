@@ -22,85 +22,102 @@ prev_time = time.time()
 
 fps = 0
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
 
+def detect_faces(frame):
     faces = app.get(frame)
-
+    detection = []
     for face in faces:
         bbox = face.bbox.astype(int)
+        landmarks = face.kps.astype(int)
+        score = face.det_score
+        detection.append({
+            "bbox": bbox,
+            "landmarks": landmarks,
+            "score": score
+        })
+    return detection
+if __name__ == "__main__":
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-        x1, y1, x2, y2 = bbox
+        detections = detect_faces(frame)
 
-        color = [(0, 255, 0), (0, 0, 255), (255, 0, 0), (255, 255, 0), (255, 0, 255)]
-        for i, point in enumerate(face.kps):
-            cv2.circle(frame, tuple(point.astype(int)), 2, color[i % len(color)], -1) 
-            """1: Right Eye, 2: Left Eye, 3: Nose, 4: Right Mouth, 5: Left Mouth"""
-            cv2.putText(
+        for face in detections:
+            bbox = face["bbox"].astype(int)
+            landmarks = face["landmarks"]
+            score = face["score"]
+
+            x1, y1, x2, y2 = bbox
+
+            color = [(0, 255, 0), (0, 0, 255), (255, 0, 0), (255, 255, 0), (255, 0, 255)]
+            for i, point in enumerate(landmarks):
+                cv2.circle(frame, tuple(point.astype(int)), 2, color[i % len(color)], -1) 
+                """1: Right Eye, 2: Left Eye, 3: Nose, 4: Right Mouth, 5: Left Mouth"""
+                cv2.putText(
+                    frame,
+                    f"{i+1}",
+                    tuple(point.astype(int) + [5, -5]),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    color[i % len(color)],
+                    1
+                )
+                left_eye = landmarks[1]
+                right_eye = landmarks[0]
+
+                angle = 180 - np.degrees(np.arctan2(right_eye[1] - left_eye[1], right_eye[0] - left_eye[0]))
+                print("Distance between eyes:", np.hypot(right_eye[0] - left_eye[0], right_eye[1] - left_eye[1]))
+                print("Angle between eyes:", angle)
+
+            cv2.line(
                 frame,
-                f"{i+1}",
-                tuple(point.astype(int) + [5, -5]),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                color[i % len(color)],
+                tuple(landmarks[0].astype(int)),
+                tuple(landmarks[1].astype(int)),
+                (255, 0, 0),
                 1
             )
-            left_eye = face.kps[1]
-            right_eye = face.kps[0]
 
-            angle = np.degrees(np.arctan2(right_eye[1] - left_eye[1], right_eye[0] - left_eye[0]))
-            print("Distance between eyes:", np.hypot(right_eye[0] - left_eye[0], right_eye[1] - left_eye[1]))
-            print("Angle between eyes:", angle)
+            center = (int((left_eye[0] + right_eye[0]) / 2), int((left_eye[1] + right_eye[1]) / 2))
+            M = cv2.getRotationMatrix2D(tuple(center), angle, 1.0)
+            aligned_face = cv2.warpAffine(frame, M, (frame.shape[1], frame.shape[0]))
 
-        cv2.line(
-            frame,
-            tuple(face.kps[0].astype(int)),
-            tuple(face.kps[1].astype(int)),
-            (255, 0, 0),
-            1
-        )
+            cv2.rectangle(
+                frame,
+                (x1, y1),
+                (x2, y2),
+                (0, 255, 0),
+                2
+            )
 
-        center = ((left_eye[0] + right_eye[0]) / 2, (left_eye[1] + right_eye[1]) / 2).astype(int)
-        M = cv2.getRotationMatrix2D(tuple(center), angle, 1.0)
-        aligned_face = cv2.warpAffine(frame, M, (frame.shape[1], frame.shape[0]))
+            cv2.putText(
+                frame,
+                f"Faces: {len(face)}",
+                (400, 30),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,(0, 255, 0), 2
+            )
 
-        cv2.rectangle(
-            frame,
-            (x1, y1),
-            (x2, y2),
-            (0, 255, 0),
-            2
-        )
+            cv2.putText(
+                frame,
+                f"Confidence: {face['score']:.2f}",
+                (x1, y1 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,(0, 255, 0), 1
+            )
 
-        cv2.putText(
-            frame,
-            f"Faces: {len(faces)}",
-            (400, 30),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,(0, 255, 0), 2
-        )
+        curr_time = time.time()
+        instant_fps = 1 / (curr_time - prev_time)
+        fps = 0.9 * fps + 0.1 * instant_fps
+        prev_time = curr_time
 
-        cv2.putText(
-            frame,
-            f"Confidence: {face.det_score:.2f}",
-            (x1, y1 - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,(0, 255, 0), 1
-        )
+        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        cv2.imshow("Face Detection", frame)
+        cv2.imshow("Aligned Face", aligned_face)
 
-    curr_time = time.time()
-    instant_fps = 1 / (curr_time - prev_time)
-    fps = 0.9 * fps + 0.1 * instant_fps
-    prev_time = curr_time
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-    cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    cv2.imshow("Face Detection", frame)
-    cv2.imshow("Aligned Face", aligned_face)
-
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+    cap.release()
+    cv2.destroyAllWindows()

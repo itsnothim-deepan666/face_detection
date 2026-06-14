@@ -1,331 +1,422 @@
 # Real-Time Face Recognition System
 
-A real-time face recognition pipeline built using **SCRFD (InsightFace)** and **OpenCV**, designed for multi-person recognition, face alignment, and embedding-based identification.
+This project is a real-time face recognition system built using **SCRFD (InsightFace)**, **OpenCV**, and **FaceNet**.
 
-This project focuses on building the full computer vision pipeline step-by-step, starting from face detection and progressing toward recognition, database matching, and attendance logging.
+The system takes a live webcam feed, detects faces, extracts facial landmarks, aligns the face properly, generates embeddings, stores known identities, and compares live embeddings for recognition.
 
----
-
-# Project Objective
-
-The goal of this project is to build a complete face recognition system capable of:
-
-* Detecting multiple faces in real time
-* Extracting facial landmarks
-* Aligning faces for consistent orientation
-* Generating facial embeddings
-* Matching identities using similarity metrics
-* Logging recognized individuals
-
-The project emphasizes both **implementation** and **understanding of the underlying concepts**.
+The purpose of this project is not just to build a working face recognition pipeline, but to understand how modern face recognition systems work internally.
 
 ---
 
-# Current Pipeline
+# Project Goal
 
-```text
+The goal of this project is to build a complete face recognition pipeline that can:
+
+* Detect faces in real time
+* Extract important facial landmarks
+* Align faces for consistency
+* Crop and preprocess face images
+* Convert faces into embeddings
+* Register known identities into a database
+* Compare embeddings for recognition
+* Reject unknown faces
+* Log recognized individuals for attendance or access control
+
+This project is being built step-by-step with focus on both implementation and understanding.
+
+---
+
+# How the System Works
+
+Current pipeline:
+
+```text id="1u1zzy"
 Webcam Feed
-     ↓
-SCRFD Face Detection
-     ↓
-Bounding Box Extraction
-     ↓
-Facial Landmark Detection
-     ↓
-Face Alignment (In Progress)
-     ↓
-Face Embedding Generation
-     ↓
-Face Recognition
-     ↓
-Attendance Logging
+   ↓
+Face Detection (SCRFD)
+   ↓
+Bounding Box + Landmarks
+   ↓
+Face Alignment
+   ↓
+Face Crop
+   ↓
+Preprocessing
+   ↓
+FaceNet Embedding
+   ↓
+Database Matching
+   ↓
+Identity Recognition
+   ↓
+Attendance Logging (Upcoming)
 ```
 
----
-
-# Technologies Used
-
-* Python 3.10
-* OpenCV
-* InsightFace
-* SCRFD
-* NumPy
-* ONNX Runtime
-* PyTorch (for future embedding generation)
+At the current stage, the system can detect faces, align them, generate embeddings, register identities, and recognize known faces.
 
 ---
 
-# Work Completed
+# Tools and Libraries Used
 
-## 1. Environment Setup
+* **Python 3.10**
+* **OpenCV**
+* **InsightFace (SCRFD)**
+* **NumPy**
+* **PyTorch**
+* **FaceNet (facenet-pytorch)**
+* **ONNX Runtime**
+* **Scikit-learn**
 
-A dedicated Python virtual environment was created for dependency isolation.
+---
+
+# What Has Been Built So Far
+
+## Environment Setup
+
+A dedicated Python virtual environment was created to isolate dependencies.
 
 Installed:
 
-```bash
+```bash id="zkgnfx"
 pip install insightface
 pip install onnxruntime-gpu
-pip install opencv-python
-pip install numpy
-pip install torch torchvision torchaudio
+pip install opencv-python==4.9.0.80
+pip install numpy==1.26.4
+pip install facenet-pytorch
+pip install scikit-learn
 ```
 
-GPU acceleration through ONNX Runtime was attempted, but due to unresolved CUDA runtime dependency issues, the current implementation uses CPU inference.
-
----
-
-## 2. Webcam Integration
-
-A real-time webcam stream was established using OpenCV:
-
-```python
-cap = cv2.VideoCapture(0)
-```
-
-This provides continuous frame capture for live face detection.
-
----
-
-## 3. Face Detection using SCRFD
-
-The SCRFD detector from InsightFace was initialized:
-
-```python
-app = FaceAnalysis(
-    name="buffalo_l",
-    providers=["CPUExecutionProvider"]
-)
-```
-
-The detector processes each frame and returns:
-
-* Bounding box coordinates
-* Facial landmarks
-* Detection confidence score
-
----
-
-## 4. Bounding Box Visualization
-
-Each detected face is enclosed using:
-
-```python
-cv2.rectangle()
-```
-
-Bounding boxes help localize faces spatially in the frame.
-
-Returned format:
-
-```text
-[x1, y1, x2, y2]
-```
-
-Where:
-
-* `(x1, y1)` → top-left corner
-* `(x2, y2)` → bottom-right corner
-
----
-
-## 5. Detection Confidence
-
-Each face includes a confidence score:
-
-```python
-face.det_score
-```
-
-This indicates how certain the detector is about the face prediction.
-
-Displayed on-screen above the bounding box.
-
----
-
-## 6. Multi-Face Detection
-
-The detector currently supports multiple simultaneous faces.
-
-Each detected face is processed independently.
-
-Current loop structure:
-
-```python
-for face in faces:
-```
-
-This makes the system scalable for multi-person recognition.
-
----
-
-## 7. FPS Measurement
-
-Performance is measured using:
-
-```python
-fps = 1 / (curr_time - prev_time)
-```
-
-To stabilize noisy readings, an exponential moving average is used:
-
-```python
-fps = 0.9 * fps + 0.1 * instant_fps
-```
-
-This smooths sudden fluctuations in frame timing.
+GPU acceleration was attempted, but due to unresolved CUDA runtime dependency issues, the system currently runs on CPU.
 
 Current performance:
 
-```text
-~3 FPS (CPU)
+```text id="5r1y40"
+~3 FPS
 ```
 
 ---
 
-## 8. Facial Landmark Extraction
+## Webcam Input
 
-SCRFD returns five key facial landmarks:
+The webcam feed is captured using:
 
-```text
-Left Eye
-Right Eye
-Nose
-Mouth Left
-Mouth Right
+```python id="jlwmx6"
+cap = cv2.VideoCapture(0)
 ```
 
-These are stored as:
-
-```python
-face.kps
-```
-
-Shape:
-
-```text
-(5,2)
-```
-
-Each point contains:
-
-```text
-[x, y]
-```
-
-coordinates.
+This acts as the live input source.
 
 ---
-
-## 9. Landmark Visualization
-
-Each landmark is drawn using:
-
-```python
-cv2.circle()
-```
-
-This allows direct visualization of facial structure and verifies detector consistency.
-
-Landmarks remain attached to the face while moving.
-
----
-
-# Concepts Learned So Far
 
 ## Face Detection
 
-Detecting facial regions within an image.
+SCRFD detects faces and returns:
+
+* Bounding boxes
+* Facial landmarks
+* Detection confidence
+
+Example:
+
+```text id="n2e5od"
+Bounding Box → [x1, y1, x2, y2]
+Confidence → 0.98
+```
 
 ---
 
-## Bounding Box Geometry
+## Multi-Face Detection
 
-Understanding image coordinates:
+Multiple faces can be processed simultaneously:
 
-```text
-(x, y)
+```python id="eqflql"
+for face in faces:
 ```
 
-for object localization.
+This makes the system scalable.
+
+---
+
+## FPS Tracking
+
+Raw FPS:
+
+```python id="ftwz6n"
+fps = 1 / (curr_time - prev_time)
+```
+
+Smoothed FPS:
+
+```python id="m9m3x2"
+fps = 0.9 * fps + 0.1 * instant_fps
+```
+
+This stabilizes the displayed performance.
 
 ---
 
 ## Facial Landmark Detection
 
-Keypoint extraction for important facial regions.
+SCRFD provides:
+
+* Left eye
+* Right eye
+* Nose
+* Left mouth corner
+* Right mouth corner
+
+These are used to estimate face orientation.
 
 ---
 
-## Confidence Scores
+## Face Alignment
 
-Understanding model certainty in predictions.
+The angle between the eyes is calculated:
 
----
+```python id="0m0qxh"
+angle = np.degrees(np.arctan2(dy, dx))
+```
 
-## Real-Time Inference
+The frame is rotated:
 
-Running detection continuously on live webcam frames.
+```python id="84ig1g"
+cv2.getRotationMatrix2D(center, -angle, 1.0)
+```
 
----
-
-## FPS Smoothing
-
-Using Exponential Moving Average (EMA) for stable performance estimation.
-
----
-
-# Current Focus
-
-The current task is implementing **face alignment**.
-
-This involves:
-
-1. Extracting eye coordinates
-2. Computing the angle between the eyes
-3. Rotating the image so the eyes become horizontal
-
-This improves consistency for the face embedding stage.
+This aligns the face horizontally and improves recognition consistency.
 
 ---
 
-# Planned Features
+## Face Cropping
 
-* Face alignment
-* Face cropping
-* Face embedding generation using FaceNet
-* Identity database creation
-* Cosine similarity matching
-* Unknown face rejection
+After alignment:
+
+```python id="9xg3pa"
+face_crop = aligned[y1:y2, x1:x2]
+```
+
+This isolates only the face.
+
+---
+
+## Face Resizing
+
+Each cropped face is resized:
+
+```python id="qmx8rd"
+cv2.resize(face_crop, (160,160))
+```
+
+This matches FaceNet’s input size.
+
+---
+
+## Face Embedding Generation
+
+FaceNet converts the processed face into a **512-dimensional embedding**.
+
+Model:
+
+```python id="8s2kec"
+model = InceptionResnetV1(
+    pretrained='vggface2'
+).eval()
+```
+
+Output:
+
+```text id="zcywvh"
+torch.Size([1,512])
+```
+
+This embedding represents the identity of the person.
+
+---
+
+## Identity Registration
+
+Known people can now be registered.
+
+Instead of storing one image, multiple samples are stored.
+
+Example:
+
+```text id="v4mvlx"
+data/
+└── john/
+    ├── img1.jpg
+    ├── img2.jpg
+    ├── img3.jpg
+```
+
+Each image is processed through:
+
+```text id="xjlwmh"
+Detect
+↓
+Align
+↓
+Crop
+↓
+Embed
+```
+
+All embeddings are stored together:
+
+```text id="2g8g7d"
+database/john.npy
+```
+
+Shape:
+
+```text id="5g8ptn"
+(3,512)
+```
+
+This improves recognition robustness.
+
+---
+
+## Face Recognition
+
+Live embeddings are compared with stored embeddings.
+
+Similarity is measured using cosine similarity.
+
+Process:
+
+```text id="k5sztf"
+Live Face
+↓
+Embedding
+↓
+Compare with Database
+↓
+Best Match
+```
+
+Example:
+
+```text id="jjlwm8"
+Stored:
+0.89
+0.84
+0.91
+```
+
+Best match:
+
+```text id="vwvdfg"
+0.91
+```
+
+If similarity is above threshold:
+
+```text id="4ye5yr"
+Recognized
+```
+
+Else:
+
+```text id="w1gxy7"
+Unknown
+```
+
+Current threshold:
+
+```text id="fd56e5"
+0.75
+```
+
+---
+
+# Important Concepts Learned
+
+## Face Detection
+
+Locating faces in an image.
+
+---
+
+## Facial Landmarks
+
+Finding important facial keypoints.
+
+---
+
+## Face Alignment
+
+Reducing pose variation using eye geometry.
+
+---
+
+## Rotation Matrices
+
+Used to rotate tilted faces.
+
+---
+
+## Tensors
+
+Converting images into neural-network-compatible numerical data.
+
+---
+
+## Embeddings
+
+Representing facial identity as a fixed-size vector.
+
+---
+
+## Gradient-Free Inference
+
+Using:
+
+```python id="5q1yhj"
+with torch.no_grad():
+```
+
+to reduce memory usage and speed up inference.
+
+---
+
+## Cosine Similarity
+
+Comparing embeddings by measuring directional similarity.
+
+This is the core of recognition.
+
+---
+
+# What Comes Next
+
+The next steps are:
+
 * Multi-person recognition
-* Attendance CSV logging
-* Recognition benchmarking
-* Accuracy evaluation
+* Multiple identity support
+* Unknown face rejection tuning
+* Attendance logging
+* Evaluation and benchmarking
+* GPU optimization
 
 ---
 
-# References
+# Research Papers Referenced
 
-### SCRFD Paper
-
-Sample and Computation Redistribution for Efficient Face Detection
-
----
-
-### RetinaFace Paper
-
-Single-stage Dense Face Localisation in the Wild
+* SCRFD — *Sample and Computation Redistribution for Efficient Face Detection*
+* RetinaFace — *Single-stage Dense Face Localisation in the Wild*
+* FaceNet — *A Unified Embedding for Face Recognition and Clustering*
 
 ---
 
-### FaceNet Paper
+# Final Goal
 
-A Unified Embedding for Face Recognition and Clustering
+The final system should be able to:
 
----
+* Recognize multiple people in real time
+* Reject unknown faces
+* Maintain attendance logs
+* Work in smart access systems
+* Integrate into robotics perception pipelines
 
-# Future Goal
-
-The final system aims to become a deployable real-time recognition pipeline suitable for:
-
-* Smart attendance systems
+The long-term aim is to understand and build a production-level face recognition pipeline from scratch.

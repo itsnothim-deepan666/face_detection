@@ -1,2 +1,3 @@
 .vscode/
 face_detect/
+src/__pycache__/

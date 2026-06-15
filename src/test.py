@@ -7,8 +7,9 @@ import numpy as np
 
 name = input("Enter the name of the person to recognize: ")
 cap = cv2.VideoCapture(0)
+a = True
 
-while True:
+while a == True:
     ret, frame = cap.read()
     if not ret:
         break
@@ -85,16 +86,22 @@ while True:
             1
         )
 
-
         embedding = embed(aligned_face[y1:y2, x1:x2])
         max_similarity = recognize_face(name, embedding)
-        cv2.putText(
-            frame,
-            f"Similarity: {max_similarity*100:.2f}%",
-            (x1, y2 + 20),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,(0, 255, 0), 1
-        )
+        if max_similarity is not None:
+            cv2.putText(
+                frame,
+                f"Similarity: {max_similarity*100:.2f}%",
+                (x1, y2 + 20),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 0),
+                1
+            )
+        else:
+            print(f"Could not recognize {name}. Please register the person first.")
+            a = False
+            break
 
     cv2.imshow("Aligned Face", aligned_face[y1:y2, x1:x2])
     cv2.imshow("Face Detection", frame)

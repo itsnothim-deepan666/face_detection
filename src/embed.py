@@ -37,14 +37,8 @@ def embed(image):
     prepared_face = _prepare_face(image)
     if prepared_face is None:
         return None
-
-    # BGR → RGB
     face_rgb = cv2.cvtColor(prepared_face, cv2.COLOR_BGR2RGB)
-
-    # float32
     face = face_rgb.astype(np.float32)
-
-    # prewhitening (critical)
     face = prewhiten(face)
 
     face_tensor = torch.from_numpy(face.astype(np.float32)) \

@@ -68,7 +68,6 @@ def process_image(image):
     if face_crop.size == 0:
         return None
 
-    # Blur filtering
     gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
     blur_score = cv2.Laplacian(gray, cv2.CV_64F).var()
 
@@ -94,10 +93,6 @@ def process_image(image):
 
 embeddings = []
 
-
-# ==========================
-# IMAGE MODE
-# ==========================
 if from_images:
     image_paths = glob.glob(
         os.path.join(person_image_dir, "*")
@@ -123,9 +118,6 @@ if from_images:
             print(f"Processed: {img_path}")
 
 
-# ==========================
-# WEBCAM MODE
-# ==========================
 else:
     cap = cv2.VideoCapture(0)
 
@@ -163,9 +155,6 @@ else:
     cv2.destroyAllWindows()
 
 
-# ==========================
-# SAVE
-# ==========================
 if len(embeddings) == 0:
     print("No valid embeddings generated.")
     exit()

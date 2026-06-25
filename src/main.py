@@ -16,9 +16,6 @@ SAVE_IMAGE_DIR = "data/images"
 os.makedirs(SAVE_EMBED_DIR, exist_ok=True)
 
 
-# -----------------------------
-# ARGUMENTS
-# -----------------------------
 parser = argparse.ArgumentParser()
 
 group = parser.add_mutually_exclusive_group(required=True)
@@ -43,10 +40,6 @@ group.add_argument(
 
 args = parser.parse_args()
 
-
-# -----------------------------
-# COMMON PROCESSOR
-# -----------------------------
 def process_image(image):
     detections = detect_faces(image)
 
@@ -94,9 +87,6 @@ def process_image(image):
     return embedding, aligned_face, face
 
 
-# -----------------------------
-# REGISTER FROM WEBCAM
-# -----------------------------
 def register_from_webcam(name):
     cap = cv2.VideoCapture(0)
 
@@ -152,9 +142,6 @@ def register_from_webcam(name):
     print(f"Saved {len(embeddings)} embeddings for {name}")
 
 
-# -----------------------------
-# REGISTER FROM IMAGES
-# -----------------------------
 def register_from_images(name):
     person_dir = os.path.join(SAVE_IMAGE_DIR, name)
 
@@ -196,9 +183,6 @@ def register_from_images(name):
     print(f"Saved {len(embeddings)} embeddings for {name}")
 
 
-# -----------------------------
-# RECOGNIZE
-# -----------------------------
 def recognize(name):
     cap = cv2.VideoCapture(0)
 
@@ -259,9 +243,6 @@ def recognize(name):
     cv2.destroyAllWindows()
 
 
-# -----------------------------
-# MODE ROUTING
-# -----------------------------
 if args.register:
     register_from_webcam(args.register)
 

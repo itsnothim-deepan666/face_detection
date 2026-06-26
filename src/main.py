@@ -1,3 +1,10 @@
+"""
+--register <name> : Register a person from webcam
+--register_from_images <name> : Register a person from data/images/{name}
+--recognize <name> : Recognize a person from webcam
+NOTE: The images for registration should be placed in data/images/{name} directory, if you are going for register_from_images.
+"""
+
 import os
 import cv2
 import glob

@@ -1,5 +1,7 @@
 .vscode/
-face_detect/
+face_detect/Lib/
+face_detect/share/
+face_detect/Include/
 src/__pycache__/
 data/images/*
 data/embeddings/*

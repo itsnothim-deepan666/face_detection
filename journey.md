@@ -110,6 +110,8 @@ cap = cv2.VideoCapture(0)
 
 This acts as the live input source.
 
+During testing, the default camera index was not always reliable on this machine, so an optional `--camera-index` argument was added to let the app target a specific device when needed or simply leave it unset and attempt auto-detection.
+
 ---
 
 ## Face Detection
@@ -208,7 +210,7 @@ Current preprocessing:
 * Resize to 160×160
 * Convert BGR → RGB
 * Convert to float32
-* Prewhiten image
+* Prewhitening
 
 Prewhitening:
 

@@ -11,11 +11,6 @@ import glob
 import argparse
 import numpy as np
 
-from detect import detect_faces
-from align import align_face
-from embed import embed
-from recognize import recognize_face
-
 
 SAVE_EMBED_DIR = "data/embeddings"
 SAVE_IMAGE_DIR = "data/images"
@@ -45,9 +40,76 @@ group.add_argument(
     help="Recognize a person from webcam"
 )
 
+parser.add_argument(
+    "--camera-index",
+    type=int,
+    default=None,
+    help="Camera device index to use (optional; if omitted, auto-detect is attempted)"
+)
+
 args = parser.parse_args()
 
+
+def open_camera(camera_index=None):
+    candidates = []
+
+    if camera_index is not None:
+        candidates.append(camera_index)
+
+    candidates.extend(i for i in range(0, 4) if i != camera_index)
+
+    for idx in candidates:
+        try:
+            cap = cv2.VideoCapture(idx)
+        except Exception:
+            cap = None
+
+        if cap is not None and cap.isOpened():
+            print(f"Camera opened successfully at index {idx}")
+            return cap
+
+        if cap is not None:
+            cap.release()
+
+        for backend in (cv2.CAP_V4L2, cv2.CAP_ANY):
+            try:
+                cap = cv2.VideoCapture(idx, backend)
+            except Exception:
+                cap = None
+
+            if cap is not None and cap.isOpened():
+                print(f"Camera opened successfully at index {idx} using backend {backend}")
+                return cap
+
+            if cap is not None:
+                cap.release()
+
+        device_path = f"/dev/video{idx}"
+        if os.path.exists(device_path):
+            try:
+                cap = cv2.VideoCapture(device_path)
+            except Exception:
+                cap = None
+
+            if cap is not None and cap.isOpened():
+                print(f"Camera opened successfully at {device_path}")
+                return cap
+
+            if cap is not None:
+                cap.release()
+
+    print(
+        "Unable to open a webcam. Check that a camera is connected and try "
+        "--camera-index 0, 1, or 2."
+    )
+    return None
+
+
 def process_image(image):
+    from detect import detect_faces
+    from align import align_face
+    from embed import embed
+
     detections = detect_faces(image)
 
     if len(detections) != 1:
@@ -95,7 +157,10 @@ def process_image(image):
 
 
 def register_from_webcam(name):
-    cap = cv2.VideoCapture(0)
+    cap = open_camera(args.camera_index)
+
+    if cap is None:
+        return
 
     embeddings = []
     required_samples = 10
@@ -191,7 +256,12 @@ def register_from_images(name):
 
 
 def recognize(name):
-    cap = cv2.VideoCapture(0)
+    from recognize import recognize_face
+
+    cap = open_camera(args.camera_index)
+
+    if cap is None:
+        return
 
     frame_count = 0
     last_similarity = None

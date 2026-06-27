@@ -82,6 +82,14 @@ All operations are done through:
 python main.py
 ```
 
+Optional camera selection:
+
+```bash
+python main.py --recognize Alice --camera-index 0
+```
+
+If `--camera-index` is omitted, the app will try to auto-detect a usable webcam. This is helpful when multiple cameras are available or when the default index is not working.
+
 ---
 
 # 1. Register From Webcam
@@ -92,6 +100,12 @@ Command:
 
 ```bash
 python main.py --register Alice
+```
+
+If needed, you can also specify a camera index:
+
+```bash
+python main.py --register Alice --camera-index 0
 ```
 
 What it does:

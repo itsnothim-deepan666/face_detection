@@ -1,115 +1,49 @@
-"""
---register <name> : Register a person from webcam
---register_from_images <name> : Register a person from data/images/{name}
---recognize <name> : Recognize a person from webcam
-NOTE: The images for registration should be placed in data/images/{name} directory, if you are going for register_from_images.
-"""
-
 import os
+os.environ["OMP_NUM_THREADS"] = "1"
+
 import cv2
 import glob
+import time
 import argparse
 import numpy as np
 
+from detect import detect_faces
+from recognize import recognize_face
 
 SAVE_EMBED_DIR = "data/embeddings"
 SAVE_IMAGE_DIR = "data/images"
 
 os.makedirs(SAVE_EMBED_DIR, exist_ok=True)
 
+# Warmup InsightFace before camera
+dummy = np.zeros((640, 640, 3), dtype=np.uint8)
+detect_faces(dummy)
 
 parser = argparse.ArgumentParser()
 
 group = parser.add_mutually_exclusive_group(required=True)
 
-group.add_argument(
-    "--register",
-    type=str,
-    help="Register a person from webcam"
-)
+group.add_argument("--register", type=str)
+group.add_argument("--register_from_images", type=str)
+group.add_argument("--recognize", type=str)
 
-group.add_argument(
-    "--register_from_images",
-    type=str,
-    help="Register a person from data/images/{name}"
-)
-
-group.add_argument(
-    "--recognize",
-    type=str,
-    help="Recognize a person from webcam"
-)
-
-parser.add_argument(
-    "--camera-index",
-    type=int,
-    default=None,
-    help="Camera device index to use (optional; if omitted, auto-detect is attempted)"
-)
+parser.add_argument("--camera-index", type=int, default=0)
 
 args = parser.parse_args()
 
 
-def open_camera(camera_index=None):
-    candidates = []
+def open_camera(camera_index=0):
+    cap = cv2.VideoCapture(camera_index, cv2.CAP_V4L2)
 
-    if camera_index is not None:
-        candidates.append(camera_index)
+    if cap.isOpened():
+        print(f"Camera opened successfully at index {camera_index}")
+        return cap
 
-    candidates.extend(i for i in range(0, 4) if i != camera_index)
-
-    for idx in candidates:
-        try:
-            cap = cv2.VideoCapture(idx)
-        except Exception:
-            cap = None
-
-        if cap is not None and cap.isOpened():
-            print(f"Camera opened successfully at index {idx}")
-            return cap
-
-        if cap is not None:
-            cap.release()
-
-        for backend in (cv2.CAP_V4L2, cv2.CAP_ANY):
-            try:
-                cap = cv2.VideoCapture(idx, backend)
-            except Exception:
-                cap = None
-
-            if cap is not None and cap.isOpened():
-                print(f"Camera opened successfully at index {idx} using backend {backend}")
-                return cap
-
-            if cap is not None:
-                cap.release()
-
-        device_path = f"/dev/video{idx}"
-        if os.path.exists(device_path):
-            try:
-                cap = cv2.VideoCapture(device_path)
-            except Exception:
-                cap = None
-
-            if cap is not None and cap.isOpened():
-                print(f"Camera opened successfully at {device_path}")
-                return cap
-
-            if cap is not None:
-                cap.release()
-
-    print(
-        "Unable to open a webcam. Check that a camera is connected and try "
-        "--camera-index 0, 1, or 2."
-    )
+    print("Unable to open camera")
     return None
 
 
 def process_image(image):
-    from detect import detect_faces
-    from align import align_face
-    from embed import embed
-
     detections = detect_faces(image)
 
     if len(detections) != 1:
@@ -118,8 +52,6 @@ def process_image(image):
     face = detections[0]
 
     bbox = face["bbox"].astype(int)
-    landmarks = face["landmarks"]
-
     x1, y1, x2, y2 = bbox
 
     x1 = max(0, x1)
@@ -138,22 +70,26 @@ def process_image(image):
     if blur_score < 100:
         return None
 
-    crop_landmarks = landmarks.copy()
-    crop_landmarks[:, 0] -= x1
-    crop_landmarks[:, 1] -= y1
+    embedding = face["embedding"]
+    embedding = embedding / np.linalg.norm(embedding)
 
-    aligned_face = align_face(
-        face_crop,
-        crop_landmarks[1],
-        crop_landmarks[0]
-    )
-
-    if aligned_face is None:
+    if embedding.shape != (512,):
         return None
 
-    embedding = embed(aligned_face)
+    return embedding, face_crop, face
 
-    return embedding, aligned_face, face
+
+def save_embeddings(name, embeddings):
+    embeddings = np.vstack(embeddings)
+
+    save_path = os.path.join(
+        SAVE_EMBED_DIR,
+        f"{name}_embeddings.npy"
+    )
+
+    np.save(save_path, embeddings)
+
+    print(f"Saved {len(embeddings)} embeddings for {name}")
 
 
 def register_from_webcam(name):
@@ -164,21 +100,26 @@ def register_from_webcam(name):
 
     embeddings = []
     required_samples = 10
+    last_capture = 0
 
     print(f"Collecting {required_samples} samples for {name}")
 
     while len(embeddings) < required_samples:
         ret, frame = cap.read()
+
         if not ret:
             break
 
         result = process_image(frame)
 
         if result is not None:
-            embedding, aligned_face, _ = result
-            embeddings.append(embedding)
+            embedding, face_crop, _ = result
 
-            cv2.imshow("Aligned Face", aligned_face)
+            if time.time() - last_capture > 0.5:
+                embeddings.append(embedding)
+                last_capture = time.time()
+
+                cv2.imshow("Face Crop", face_crop)
 
         cv2.putText(
             frame,
@@ -192,7 +133,7 @@ def register_from_webcam(name):
 
         cv2.imshow("Register", frame)
 
-        if cv2.waitKey(500) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     cap.release()
@@ -202,24 +143,12 @@ def register_from_webcam(name):
         print("No embeddings collected.")
         return
 
-    embeddings = np.vstack(embeddings)
-
-    save_path = os.path.join(
-        SAVE_EMBED_DIR,
-        f"{name}_embeddings.npy"
-    )
-
-    np.save(save_path, embeddings)
-
-    print(f"Saved {len(embeddings)} embeddings for {name}")
+    save_embeddings(name, embeddings)
 
 
 def register_from_images(name):
     person_dir = os.path.join(SAVE_IMAGE_DIR, name)
-
-    image_paths = glob.glob(
-        os.path.join(person_dir, "*")
-    )
+    image_paths = glob.glob(os.path.join(person_dir, "*"))
 
     if len(image_paths) == 0:
         print("No images found.")
@@ -243,27 +172,15 @@ def register_from_images(name):
         print("No valid embeddings.")
         return
 
-    embeddings = np.vstack(embeddings)
-
-    save_path = os.path.join(
-        SAVE_EMBED_DIR,
-        f"{name}_embeddings.npy"
-    )
-
-    np.save(save_path, embeddings)
-
-    print(f"Saved {len(embeddings)} embeddings for {name}")
+    save_embeddings(name, embeddings)
 
 
 def recognize(name):
-    from recognize import recognize_face
-
     cap = open_camera(args.camera_index)
 
     if cap is None:
         return
 
-    frame_count = 0
     last_similarity = None
 
     while True:
@@ -272,33 +189,29 @@ def recognize(name):
         if not ret:
             break
 
-        frame_count += 1
+        result = process_image(frame)
 
-        if frame_count % 10 == 0:
-            result = process_image(frame)
+        if result is not None:
+            embedding, face_crop, face = result
 
-            if result is not None:
-                embedding, aligned_face, face = result
+            match = recognize_face(name, embedding)
 
-                match = recognize_face(name, embedding)
+            if match is not None:
+                matched_name, similarity = match
+                last_similarity = similarity
 
-                if match is not None:
-                    matched_name, similarity = match
-                    last_similarity = similarity
+            bbox = face["bbox"].astype(int)
+            x1, y1, x2, y2 = bbox
 
-                bbox = face["bbox"].astype(int)
+            cv2.rectangle(
+                frame,
+                (x1, y1),
+                (x2, y2),
+                (0, 255, 0),
+                2
+            )
 
-                x1, y1, x2, y2 = bbox
-
-                cv2.rectangle(
-                    frame,
-                    (x1, y1),
-                    (x2, y2),
-                    (0, 255, 0),
-                    2
-                )
-
-                cv2.imshow("Aligned Face", aligned_face)
+            cv2.imshow("Face Crop", face_crop)
 
         if last_similarity is not None:
             cv2.putText(
@@ -313,7 +226,7 @@ def recognize(name):
 
         cv2.imshow("Recognition", frame)
 
-        if cv2.waitKey(1) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord("q"):
             break
 
     cap.release()

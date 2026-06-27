@@ -1,12 +1,11 @@
 import os
 import cv2
 import glob
+import time
 import argparse
 import numpy as np
 
 from detect import detect_faces
-from align import align_face
-from embed import embed
 
 SAVE_EMBED_DIR = "data/embeddings"
 SAVE_IMAGE_DIR = "data/images"
@@ -15,6 +14,7 @@ os.makedirs(SAVE_EMBED_DIR, exist_ok=True)
 
 
 parser = argparse.ArgumentParser()
+
 parser.add_argument(
     "--name",
     type=str,
@@ -54,8 +54,6 @@ def process_image(image):
     face = detections[0]
 
     bbox = face["bbox"].astype(int)
-    landmarks = face["landmarks"]
-
     x1, y1, x2, y2 = bbox
 
     x1 = max(0, x1)
@@ -66,6 +64,7 @@ def process_image(image):
     face_crop = image[y1:y2, x1:x2]
 
     if face_crop.size == 0:
+        print("Skipping: invalid crop")
         return None
 
     gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
@@ -75,20 +74,14 @@ def process_image(image):
         print("Skipping: blurry image")
         return None
 
-    crop_landmarks = landmarks.copy()
-    crop_landmarks[:, 0] -= x1
-    crop_landmarks[:, 1] -= y1
+    embedding = face["embedding"]
+    embedding = embedding / np.linalg.norm(embedding)
 
-    aligned_face = align_face(
-        face_crop,
-        crop_landmarks[1],
-        crop_landmarks[0]
-    )
-
-    if aligned_face is None:
+    if embedding.shape != (512,):
+        print(f"Skipping: invalid embedding shape {embedding.shape}")
         return None
 
-    return embed(aligned_face)
+    return embedding, face_crop
 
 
 embeddings = []
@@ -111,17 +104,24 @@ if from_images:
             print(f"Skipping unreadable file: {img_path}")
             continue
 
-        embedding = process_image(image)
+        result = process_image(image)
 
-        if embedding is not None:
+        if result is not None:
+            embedding, _ = result
             embeddings.append(embedding)
+
             print(f"Processed: {img_path}")
 
 
 else:
     cap = cv2.VideoCapture(0)
 
+    if not cap.isOpened():
+        print("Failed to open webcam")
+        exit()
+
     required_samples = 10
+    last_capture = 0
 
     print(f"Collecting {required_samples} samples for {name}...")
 
@@ -131,10 +131,16 @@ else:
         if not ret:
             break
 
-        embedding = process_image(frame)
+        result = process_image(frame)
 
-        if embedding is not None:
-            embeddings.append(embedding)
+        if result is not None:
+            embedding, face_crop = result
+
+            if time.time() - last_capture > 0.5:
+                embeddings.append(embedding)
+                last_capture = time.time()
+
+                cv2.imshow("Face Crop", face_crop)
 
         cv2.putText(
             frame,
@@ -148,7 +154,7 @@ else:
 
         cv2.imshow("Register", frame)
 
-        if cv2.waitKey(500) & 0xFF == ord('q'):
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     cap.release()

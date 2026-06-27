@@ -1,5 +1,5 @@
-import numpy as np
 import os
+import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -12,8 +12,11 @@ def recognize_face(name, embedding, threshold=0.6):
 
     db_embeddings = np.load(path)
 
-    query = np.array(embedding).reshape(1, -1)
+    if db_embeddings.ndim != 2 or db_embeddings.shape[1] != 512:
+        print("Corrupted embedding database.")
+        return None
 
+    query = embedding.reshape(1, -1)
     query = query / (np.linalg.norm(query) + 1e-10)
 
     centroid = np.mean(db_embeddings, axis=0)
@@ -25,6 +28,7 @@ def recognize_face(name, embedding, threshold=0.6):
     )[0][0]
 
     sample_scores = cosine_similarity(query, db_embeddings)[0]
+
     topk = np.sort(sample_scores)[-3:]
     topk_score = np.mean(topk)
 
